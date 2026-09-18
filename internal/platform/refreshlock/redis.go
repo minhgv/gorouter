@@ -27,6 +27,9 @@ func NewRedis(client redis.UniversalClient, ttl time.Duration) (*Redis, error) {
 }
 
 func (l *Redis) WithLock(ctx context.Context, key string, fn func() error) (bool, error) {
+	if l == nil || l.client == nil {
+		return false, ErrUnavailable
+	}
 	tokenBytes := make([]byte, 16)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return false, err

@@ -22,7 +22,7 @@ func (g *Gateway) userModels(ctx context.Context, key *GatewayAccessContext, mod
 	}
 	owned := map[string]bool{}
 	for _, c := range creds {
-		if c.OwnerUserID == key.Actor.UserID && c.Status == entities.StatusActive {
+		if (c.OwnerUserID == key.Actor.UserID || (c.OwnerUserID == "" && c.OwnerTenantID == nil)) && c.Status == entities.StatusActive {
 			owned[c.ID] = true
 		}
 	}

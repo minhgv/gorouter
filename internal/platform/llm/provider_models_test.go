@@ -48,7 +48,7 @@ func TestAntigravityRequestKeepsReasoningInBodyNotModelName(t *testing.T) {
 	if strings.Contains(text, "gpt-5.6-sol-medium") {
 		t.Fatalf("reasoning leaked into model id: %s", text)
 	}
-	if !strings.Contains(text, `"thinkingLevel":"medium"`) {
+	if !strings.Contains(text, `"thinkingLevel":"MEDIUM"`) {
 		t.Fatalf("request-scoped effort missing: %s", text)
 	}
 }

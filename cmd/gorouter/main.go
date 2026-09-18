@@ -207,9 +207,10 @@ func main() {
 	}
 	var distributedRefreshLock *refreshlock.Redis
 	if redisClient != nil {
-		distributedRefreshLock, err = refreshlock.NewRedis(redisClient, 10*time.Minute)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to initialize distributed refresh lock")
+		var lockErr error
+		distributedRefreshLock, lockErr = refreshlock.NewRedis(redisClient, 10*time.Minute)
+		if lockErr != nil {
+			log.Fatal().Err(lockErr).Msg("failed to initialize distributed refresh lock")
 		}
 	}
 	if cfg.Pricing.Enabled {
@@ -253,7 +254,11 @@ func main() {
 	openai := &llm.OpenAIAdapter{HTTP: client}
 	anthropic := &llm.AnthropicAdapter{HTTP: client, OAuthClientID: cfg.OAuthClientID}
 	refresher := &llm.AnthropicOAuthRefresher{HTTP: client, TokenURL: cfg.OAuthTokenURL, ClientID: cfg.OAuthClientID, Persister: credSvc}
-	oauthRefresh := &oauthmaintenance.Service{Store: credSvc, Locker: distributedRefreshLock, Refreshers: map[string]oauthmaintenance.Refresh{}}
+	var refreshLocker oauthmaintenance.Locker
+	if distributedRefreshLock != nil {
+		refreshLocker = distributedRefreshLock
+	}
+	oauthRefresh := &oauthmaintenance.Service{Store: credSvc, Locker: refreshLocker, Refreshers: map[string]oauthmaintenance.Refresh{}}
 	anthropic.Refresh = func(ctx context.Context, cr *entities.CredentialRuntime) error {
 		return oauthRefresh.Refresh(ctx, cr, true)
 	}
