@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { copyText } from "../lib/clipboard";
 import { Modal } from "./Modal";
 
 export function SecretModal({
@@ -14,29 +15,8 @@ export function SecretModal({
   const [copyError, setCopyError] = useState("");
   const copy = async () => {
     setCopyError("");
-    let copied = false;
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(secret);
-        copied = true;
-      } catch {
-        // Plain HTTP and restrictive browser policies may expose Clipboard API
-        // while rejecting writes. Fall through to the legacy selection path.
-      }
-    }
     try {
-      if (!copied) {
-        const input = document.createElement("textarea");
-        input.value = secret;
-        input.setAttribute("readonly", "");
-        input.style.position = "fixed";
-        input.style.opacity = "0";
-        document.body.appendChild(input);
-        input.select();
-        copied = document.execCommand("copy");
-        input.remove();
-        if (!copied) throw new Error("copy command was rejected");
-      }
+      if (!(await copyText(secret))) throw new Error("copy command was rejected");
       setCopied(true);
     } catch {
       setCopied(false);

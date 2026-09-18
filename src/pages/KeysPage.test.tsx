@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { KeysPage } from "./KeysPage";
 
@@ -184,4 +184,15 @@ test("copies a revealed key with the HTTP-safe clipboard fallback", async () => 
 
   await waitFor(() => expect(copy).toHaveBeenCalledWith("copy"));
   expect(screen.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+});
+
+test("lists gateway endpoints with copy buttons", async () => {
+  const { container } = render(<KeysPage />);
+  const page = within(container);
+  expect(await page.findByText("Gateway endpoints")).toBeInTheDocument();
+  expect(page.getByText(/\/v1\/chat\/completions/)).toBeInTheDocument();
+  expect(page.getByText(/\/v1\/models/)).toBeInTheDocument();
+  expect(page.getByText(/\/v1\/responses/)).toBeInTheDocument();
+  expect(page.getByText(/\/v1\/messages/)).toBeInTheDocument();
+  expect(page.getAllByRole("button", { name: "Copy" }).length).toBe(5);
 });

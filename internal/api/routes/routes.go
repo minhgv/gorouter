@@ -48,6 +48,7 @@ type Dependencies struct {
 	OAuth            *oauthpkg.Service
 	OAuthAvailable   func(string) bool
 	Pricing          handlers.PriceCatalog
+	PriceSync        handlers.PriceSyncer
 	ProviderQuotas   *providerquota.Service
 	BodyLimit        int
 	ReadTimeout      time.Duration
@@ -170,7 +171,7 @@ func New(d Dependencies) *fiber.App {
 	app.Post("/v1/messages/", handlers.Require(d.Auth, "chat"), d.Gateway.Messages)
 	app.Get("/v1/models", handlers.Optional(d.Auth, entities.ScopeChat), d.Gateway.ListModels)
 
-	admin := &handlers.Admin{OrgModels: d.OrgModels, Auth: d.Auth, TenantSvc: d.Tenants, CredsSvc: d.Credentials, KeysSvc: d.Keys, ModelsSvc: d.Models, UsageSvc: d.Usage, Cache: d.Cache, Pricing: d.Pricing, IdentitySvc: d.Identity, IdentityRepo: d.IdentityRepo, AuditRepo: d.Audit, OAuthAvailable: d.OAuthAvailable}
+	admin := &handlers.Admin{OrgModels: d.OrgModels, Auth: d.Auth, TenantSvc: d.Tenants, CredsSvc: d.Credentials, KeysSvc: d.Keys, ModelsSvc: d.Models, UsageSvc: d.Usage, Cache: d.Cache, Pricing: d.Pricing, PriceSync: d.PriceSync, IdentitySvc: d.Identity, IdentityRepo: d.IdentityRepo, AuditRepo: d.Audit, OAuthAvailable: d.OAuthAvailable}
 	mgmt := app.Group("/admin", handlers.Require(d.Auth, ""))
 	mgmt.Get("/session", admin.Session)
 	mgmt.Get("/capabilities", admin.Capabilities)
@@ -235,6 +236,7 @@ func New(d Dependencies) *fiber.App {
 	mgmt.Get("/prices", handlers.Require(d.Auth, "models:manage"), admin.Prices)
 	mgmt.Get("/pricing/catalog", handlers.Require(d.Auth, entities.ScopeModelsManage), admin.PricingCatalog)
 	mgmt.Get("/pricing/estimate", handlers.Require(d.Auth, entities.ScopeModelsManage), admin.PricingEstimate)
+	mgmt.Post("/pricing/sync", handlers.Require(d.Auth, entities.ScopeModelsManage), admin.PricingSync)
 	mgmt.Put("/prices/:model", handlers.Require(d.Auth, "models:manage"), admin.Price)
 	mgmt.Delete("/prices/:model", handlers.Require(d.Auth, "models:manage"), admin.Price)
 	mgmt.Get("/usage/summary", handlers.Require(d.Auth, entities.ScopeUsageRead), admin.UsageSummary)

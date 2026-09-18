@@ -8,6 +8,7 @@ import { SecretModal } from '../components/SecretModal'
 import { SearchableSelect, TruncatedText } from '../components/SearchableSelect'
 import { useSession } from '../context/SessionContext'
 import { formatDateTime } from '../lib/format'
+import { copyText } from '../lib/clipboard'
 import { priceSummary } from '../lib/pricing'
 
 export function KeysPage() {
@@ -39,11 +40,26 @@ export function KeysPage() {
   const remove = async (key: APIKey) => { if (!window.confirm(`Delete ${key.name}?`)) return; try { await deleteAPIKey(key.id); await load() } catch (reason) { setError((reason as Error).message) } }
   return <>
     <header className="page-header"><div><span className="eyebrow">Manage / Access</span><h1>API keys</h1><p>Create chat-only keys for a member of an organization, with explicit model and spending limits.</p></div><button className="button" onClick={() => setCreating(true)}>Create API key</button></header>
+    <EndpointPanel />
     <ErrorBanner message={error} />
     {loading ? <PageLoading /> : keys.length === 0 ? <Empty title="No visible API keys" detail="Create a key for an organization member." /> : <section className="panel table-panel"><div className="table-scroll"><table className="management-table"><thead><tr><th>Name</th><th>User</th><th>Organization</th><th>Allowed models</th><th>Spending limit</th><th>Status</th><th /></tr></thead><tbody>{keys.map((key) => { const keyUser = userNames.get(key.owner_user_id ?? '') ?? key.owner_user_id ?? '—'; const keyOrganization = organizationNames.get(key.context_organization_id ?? '') ?? key.context_organization_id ?? '—'; const modelList = key.models.join(', ') || 'none'; return <tr key={key.id}><td><strong><TruncatedText>{key.name}</TruncatedText></strong><small title={`${key.key_prefix} · ${formatDateTime(key.created_at)}`}>{key.key_prefix} · {formatDateTime(key.created_at)}</small></td><td title={keyUser}>{keyUser}</td><td title={keyOrganization}>{keyOrganization}</td><td className="wrap-cell" title={modelList}>{modelList}</td><td>{key.quota_usd == null ? 'Uses allocated quota' : `$${key.quota_usd}/${key.quota_period}`}</td><td><Badge tone={key.enabled ? 'good' : ''}>{key.enabled ? 'enabled' : 'disabled'}</Badge></td><td><div className="compact-actions"><button aria-label={`View ${key.name} API key`} title="View API key" onClick={() => void reveal(key)}>👁</button><button onClick={() => setEditing(key)}>Edit</button><button onClick={() => void toggle(key)}>{key.enabled ? 'Disable' : 'Enable'}</button><button onClick={() => void rotate(key)}>Rotate</button><button className="danger-text" onClick={() => void remove(key)}>Delete</button></div></td></tr> })}</tbody></table></div></section>}
     {(creating || editing) && <KeyModal existing={editing} organizations={organizations} users={users} session={session} onClose={() => { setCreating(false); setEditing(null) }} onSaved={(plaintext) => { setCreating(false); setEditing(null); if (plaintext) setSecret(plaintext); void load() }} />}
     {secret && <SecretModal secret={secret} title={secretTitle} onClose={() => setSecret('')} />}
   </>
+}
+
+function EndpointPanel() {
+  const [copied, setCopied] = useState('')
+  const base = `${window.location.origin}/v1`
+  const endpoints = [
+    { label: 'Base URL', value: base },
+    { label: 'List models', value: `GET ${base}/models` },
+    { label: 'Chat completions', value: `POST ${base}/chat/completions` },
+    { label: 'Responses', value: `POST ${base}/responses` },
+    { label: 'Messages (Anthropic)', value: `POST ${base}/messages` },
+  ]
+  const copy = async (label: string, value: string) => { if (await copyText(value)) setCopied(label) }
+  return <section className="panel endpoint-panel"><div className="panel-header"><div><span className="eyebrow">OpenAI-compatible</span><h2>Gateway endpoints</h2><p>Authenticate with <code>Authorization: Bearer &lt;api-key&gt;</code>.</p></div></div><ul className="endpoint-list">{endpoints.map((endpoint) => <li key={endpoint.label}><span className="endpoint-label">{endpoint.label}</span><code title={endpoint.value}>{endpoint.value}</code><button onClick={() => void copy(endpoint.label, endpoint.value)}>{copied === endpoint.label ? 'Copied' : 'Copy'}</button></li>)}</ul></section>
 }
 
 function KeyModal({ existing, organizations, users, session, onClose, onSaved }: { existing: APIKey | null; organizations: Organization[]; users: User[]; session: Session | null; onClose: () => void; onSaved: (secret: string) => void }) {

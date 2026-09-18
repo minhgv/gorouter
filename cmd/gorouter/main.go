@@ -213,16 +213,18 @@ func main() {
 			log.Fatal().Err(lockErr).Msg("failed to initialize distributed refresh lock")
 		}
 	}
+	var priceSync handlers.PriceSyncer
 	if cfg.Pricing.Enabled {
 		priceImporter := &platformpricing.HTTPImporter{
 			Client: &http.Client{Timeout: cfg.Pricing.HTTPTimeout},
 			URL:    cfg.Pricing.CatalogURL, Source: platformpricing.SourceOpenRouter,
 		}
-		priceSync := pricing.NewCatalogService(modelRepo, priceImporter, platformpricing.SourceOpenRouter, priceResolver)
+		catalogSync := pricing.NewCatalogService(modelRepo, priceImporter, platformpricing.SourceOpenRouter, priceResolver)
 		if distributedRefreshLock != nil {
-			priceSync.SetRefreshLocker(distributedRefreshLock)
+			catalogSync.SetRefreshLocker(distributedRefreshLock)
 		}
-		priceSync.Start(ctx, cfg.Pricing.SyncInterval, func(err error) { log.Warn().Err(err).Msg("failed to sync OpenRouter catalog") })
+		catalogSync.Start(ctx, cfg.Pricing.SyncInterval, func(err error) { log.Warn().Err(err).Msg("failed to sync OpenRouter catalog") })
+		priceSync = catalogSync
 	}
 	if clickhouseStore != nil {
 		if redisClient != nil {
@@ -383,7 +385,7 @@ func main() {
 		Models: modelSvc, Usage: usageSvc, Cache: cacheSvc, Gateway: gw,
 		Identity: identitySvc, IdentityRepo: identityRepo, Audit: auditRepo,
 		OpenAI: openai, Anthropic: anthropic, Codex: codex, Providers: providerProbes, OAuth: oauthSvc, OAuthAvailable: oauthSvc.OAuthAvailable,
-		Pricing: priceResolver, ProviderQuotas: providerQuotaSvc,
+		Pricing: priceResolver, PriceSync: priceSync, ProviderQuotas: providerQuotaSvc,
 		BodyLimit: int(cfg.RequestLimit), ReadTimeout: cfg.RequestTimeout,
 		TelemetryEnabled: cfg.Telemetry.Enabled,
 	})

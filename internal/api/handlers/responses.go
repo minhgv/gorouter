@@ -91,8 +91,9 @@ func (g *Gateway) Responses(c fiber.Ctx) error {
 		Status: "completed", Background: false, OutputText: text,
 		Output: []ResponsesOutput{{ID: entities.NewID("msg"), Type: "message", Role: "assistant", Content: []ResponsesContent{{Type: "output_text", Text: text, Annotations: []any{}, Logprobs: []any{}}}}},
 		Usage: ResponsesUsage{
-			InputTokens: chatResp.Usage.PromptTokens + chatResp.Usage.CacheReadTokens, OutputTokens: chatResp.Usage.CompletionTokens,
-			TotalTokens:         chatResp.Usage.Total() + chatResp.Usage.CacheReadTokens,
+			InputTokens:         chatResp.Usage.PromptTokens + chatResp.Usage.CacheReadTokens + chatResp.Usage.CacheWriteTokens,
+			OutputTokens:        chatResp.Usage.CompletionTokens,
+			TotalTokens:         chatResp.Usage.Total() + chatResp.Usage.CacheReadTokens + chatResp.Usage.CacheWriteTokens,
 			InputTokensDetails:  ResponsesInputTokensDetails{CachedTokens: chatResp.Usage.CacheReadTokens, CacheWriteTokens: chatResp.Usage.CacheWriteTokens},
 			OutputTokensDetails: ResponsesOutputTokensDetails{},
 		},
@@ -431,11 +432,11 @@ func (s *responsesStreamEmitter) Completed(w *bufio.Writer, usage llm.Usage) err
 		}
 	}
 	responseUsage := map[string]any{
-		"input_tokens":          usage.PromptTokens + usage.CacheReadTokens,
-		"input_tokens_details":  map[string]any{"cached_tokens": usage.CacheReadTokens},
+		"input_tokens":          usage.PromptTokens + usage.CacheReadTokens + usage.CacheWriteTokens,
+		"input_tokens_details":  map[string]any{"cached_tokens": usage.CacheReadTokens, "cache_write_tokens": usage.CacheWriteTokens},
 		"output_tokens":         usage.CompletionTokens,
 		"output_tokens_details": map[string]any{"reasoning_tokens": 0},
-		"total_tokens":          usage.Total() + usage.CacheReadTokens,
+		"total_tokens":          usage.Total() + usage.CacheReadTokens + usage.CacheWriteTokens,
 	}
 	if err := s.write(w, "response.completed", map[string]any{"response": s.response("completed", output, responseUsage)}); err != nil {
 		return err

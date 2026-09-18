@@ -23,6 +23,15 @@ func TestZeroPriceIsStillPriced(t *testing.T) {
 	}
 }
 
+func TestCalculateCostFallsBackToInputRateForUnpricedCache(t *testing.T) {
+	u := TokenUsage{PromptTokens: 100, CompletionTokens: 10, CacheReadTokens: 1_000_000, CacheWriteTokens: 500_000}
+	got := CalculateCost(&Price{InputPerM: 2, OutputPerM: 8}, u)
+	want := 100*2/1e6 + 10*8/1e6 + 2.0 + 1.0
+	if !got.Priced || got.USD != want || got.CacheReadUSD != 2.0 || got.CacheWriteUSD != 1.0 {
+		t.Fatalf("unpriced cache must fall back to input rate: %+v want %.10f", got, want)
+	}
+}
+
 func TestEstimateCostsDerivesCachedAndUncachedTotals(t *testing.T) {
 	p := &Price{InputPerM: 2, OutputPerM: 4, CachedInputPerM: 0.2}
 	estimates := EstimateCosts(p, 1_000_000, 500_000, true)

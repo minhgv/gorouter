@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { deleteModel, deletePrice, discoverModels, getCredentials, getModels, getPricingCatalog, getCallableModels, saveModel, savePrice } from '../api/client'
+import { deleteModel, deletePrice, discoverModels, getCredentials, getModels, getPricingCatalog, getCallableModels, saveModel, savePrice, syncPricingCatalog } from '../api/client'
 import type { CatalogPrice, Credential, ModelDefinition, ModelRoute, Price, ProviderModel } from '../api/contracts'
 import { Badge, Empty, ErrorBanner, Field } from '../components/Management'
 import { PersonalModelAliasesModal } from '../components/PersonalModelAliasesModal'
@@ -65,6 +65,8 @@ export function ModelsPage() {
   const [editing, setEditing] = useState<ModelDefinition | null>(null)
   const [draft, setDraft] = useState<ModelDefinition | null>(null)
   const [usage, setUsage] = useState<{ model: string; price: Price } | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -106,13 +108,15 @@ export function ModelsPage() {
   const pagedConnected = useMemo(() => visibleConnected.slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize), [catalogPage, visibleConnected])
   useEffect(() => { setCatalogPage(1) }, [search])
   useEffect(() => { if (catalogPage > catalogPages) setCatalogPage(catalogPages) }, [catalogPage, catalogPages])
+  const syncPrices = async () => { setSyncing(true); setSyncMessage(''); try { await syncPricingCatalog(); setSyncMessage('Catalog prices refreshed'); await load() } catch (reason) { setSyncMessage((reason as Error).message) } finally { setSyncing(false) } }
   const closeModal = () => { setEditing(null); setDraft(null) }
   const remove = async (name: string) => { if (!window.confirm(`Delete model blend ${name}?`)) return; try { await deleteModel(name); await load() } catch (reason) { setError((reason as Error).message) } }
   const addConnected = (item: ConnectedModel) => setDraft({ name: item.model.public_id, upstream_model: item.model.id, strategy: 'priority', enabled: true, routes: [{ credential_id: item.credential.id, priority: 0, weight: 1, enabled: true }] })
 
   return <>
- {aliasesOpen && <PersonalModelAliasesModal onClose={() => setAliasesOpen(false)} />}
-    <header className="page-header"><div><span className="eyebrow">Manage / Models</span><h1>Models</h1><p>Browse every model exposed by connected providers, then create stable public model blends with stacked routes.</p></div>{session?.principal_type === 'user' && <button className="button secondary" onClick={() => setAliasesOpen(true)}>Aliases and my limits</button>}{isMasterView && <button className="button" onClick={() => setDraft({ name: '', upstream_model: '', strategy: 'priority', enabled: true, routes: [] })}>Create blend</button>}</header>
+    {aliasesOpen && <PersonalModelAliasesModal onClose={() => setAliasesOpen(false)} />}
+    <header className="page-header"><div><span className="eyebrow">Manage / Models</span><h1>Models</h1><p>Browse every model exposed by connected providers, then create stable public model blends with stacked routes.</p></div>{session?.principal_type === 'user' && <button className="button secondary" onClick={() => setAliasesOpen(true)}>Aliases and my limits</button>}{isMasterView && <><button className="button secondary" disabled={syncing} onClick={() => void syncPrices()}>{syncing ? 'Syncing…' : 'Sync prices'}</button><button className="button" onClick={() => setDraft({ name: '', upstream_model: '', strategy: 'priority', enabled: true, routes: [] })}>Create blend</button></>}</header>
+    {syncMessage && <div className="banner success-banner">{syncMessage}</div>}
     <ErrorBanner message={error} />
     <div className="page-tabs" role="tablist"><button className={tab === 'catalog' ? 'active' : ''} onClick={() => setTab('catalog')}>Available models <span>{connected.length}</span></button><button className={tab === 'blends' ? 'active' : ''} onClick={() => setTab('blends')}>Model blends <span>{models.length}</span></button></div>
     {loading ? <PageLoading /> : tab === 'catalog' ? <>

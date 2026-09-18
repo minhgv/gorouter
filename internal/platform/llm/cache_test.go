@@ -36,6 +36,26 @@ func TestUsageNormalizesDeepSeekCacheFields(t *testing.T) {
 	}
 }
 
+func TestUsageNormalizesTopLevelCacheFields(t *testing.T) {
+	var usage Usage
+	if err := json.Unmarshal([]byte(`{"prompt_tokens":1000,"completion_tokens":20,"cache_read_input_tokens":800,"cache_creation_input_tokens":100}`), &usage); err != nil {
+		t.Fatal(err)
+	}
+	if usage.PromptTokens != 100 || usage.CacheReadTokens != 800 || usage.CacheWriteTokens != 100 || usage.CompletionTokens != 20 {
+		t.Fatalf("usage = %+v", usage)
+	}
+}
+
+func TestUsageNormalizesTopLevelCachedTokens(t *testing.T) {
+	var usage Usage
+	if err := json.Unmarshal([]byte(`{"prompt_tokens":500,"completion_tokens":10,"cached_tokens":400}`), &usage); err != nil {
+		t.Fatal(err)
+	}
+	if usage.PromptTokens != 100 || usage.CacheReadTokens != 400 {
+		t.Fatalf("usage = %+v", usage)
+	}
+}
+
 func TestStablePromptCacheKeyUsesOnlyReusablePrefix(t *testing.T) {
 	base := &ChatRequest{Messages: []Message{{Role: "developer", Content: json.RawMessage(`"stable instructions"`)}, {Role: "user", Content: json.RawMessage(`"first question"`)}}}
 	changed := &ChatRequest{Messages: []Message{{Role: "developer", Content: json.RawMessage(`"stable instructions"`)}, {Role: "user", Content: json.RawMessage(`"different question"`)}}}

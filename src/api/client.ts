@@ -165,6 +165,7 @@ export const getPricingCatalog = async (): Promise<CatalogPrice[]> => {
     if (data.length >= page.total || page.data.length === 0) return data
   }
 }
+export const syncPricingCatalog = (): Promise<{ ok: boolean }> => request('/admin/pricing/sync', { method: 'POST' })
 
 export const getAuditEvents = (filters: AuditFilters, cursor = ''): Promise<ListResponse<AuditEvent>> => {
   const params = new URLSearchParams({ limit: '100' })

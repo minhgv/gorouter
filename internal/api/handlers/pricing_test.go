@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
@@ -161,4 +162,66 @@ func TestPricingEndpointsValidateInputsAndAvailability(t *testing.T) {
 			}
 		})
 	}
+}
+
+type priceSyncStub struct {
+	calls int
+	err   error
+}
+
+func (s *priceSyncStub) Sync(context.Context) error {
+	s.calls++
+	return s.err
+}
+
+func TestPricingSyncRequiresMasterAndSyncer(t *testing.T) {
+	master := &entities.Session{Role: entities.RoleMaster, PrincipalType: entities.PrincipalMaster}
+	user := &entities.Session{Role: entities.RoleAPIKey, PrincipalType: entities.PrincipalUser, UserID: "user_1"}
+
+	t.Run("unavailable without syncer", func(t *testing.T) {
+		app := fiber.New()
+		app.Post("/sync", func(c fiber.Ctx) error { c.Locals(localSession, master); return (&Admin{}).PricingSync(c) })
+		response, err := app.Test(httptest.NewRequest("POST", "/sync", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != fiber.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want 503", response.StatusCode)
+		}
+	})
+
+	t.Run("forbidden for non-master", func(t *testing.T) {
+		syncer := &priceSyncStub{}
+		app := fiber.New()
+		app.Post("/sync", func(c fiber.Ctx) error {
+			c.Locals(localSession, user)
+			return (&Admin{PriceSync: syncer}).PricingSync(c)
+		})
+		response, err := app.Test(httptest.NewRequest("POST", "/sync", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != fiber.StatusForbidden || syncer.calls != 0 {
+			t.Fatalf("status = %d calls = %d, want 403 and no sync", response.StatusCode, syncer.calls)
+		}
+	})
+
+	t.Run("master triggers sync", func(t *testing.T) {
+		syncer := &priceSyncStub{}
+		app := fiber.New()
+		app.Post("/sync", func(c fiber.Ctx) error {
+			c.Locals(localSession, master)
+			return (&Admin{PriceSync: syncer}).PricingSync(c)
+		})
+		response, err := app.Test(httptest.NewRequest("POST", "/sync", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != fiber.StatusOK || syncer.calls != 1 {
+			t.Fatalf("status = %d calls = %d, want 200 and one sync", response.StatusCode, syncer.calls)
+		}
+	})
 }

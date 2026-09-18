@@ -141,6 +141,12 @@ type PriceCatalog interface {
 	CatalogPrices() []entities.CatalogPrice
 }
 
+// PriceSyncer triggers an on-demand catalog price refresh. Implemented by
+// *pricing.CatalogService; nil when catalog sync is not configured.
+type PriceSyncer interface {
+	Sync(ctx context.Context) error
+}
+
 // Chat proxies an OpenAI-compatible chat completion with principal policy and attribution.
 // @Summary Create a chat completion
 // @Description Accepts an OpenAI-compatible chat request, applies authentication, model policy, quota, cache, routing, and usage accounting, then returns a provider response or stream.

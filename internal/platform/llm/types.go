@@ -242,12 +242,22 @@ func (u *Usage) UnmarshalJSON(data []byte) error {
 	// Standard OpenAI details report cached and created tokens as subsets of
 	// prompt/input_tokens. Store only the uncached remainder in PromptTokens so
 	// provider-cache rates and costs do not double-count the cached prefix.
+	// Provider-specific top-level cache fields are subsets of
+	// prompt/input_tokens. Our own normalized cache_read_tokens /
+	// cache_write_tokens are NOT subtracted: PromptTokens already excludes
+	// them, so re-parsing a serialized Usage must stay idempotent.
+	providerSubsetRead := max(wire.CacheReadInputTokens, wire.CachedTokens)
+	providerSubsetWrite := wire.CacheCreationInputTokens
 	if detailsRead > 0 || detailsWrite > 0 {
 		totalInput = max(int64(0), totalInput-detailsRead-detailsWrite)
 	} else if wire.PromptCacheMissTokens > 0 {
 		totalInput = wire.PromptCacheMissTokens
 	} else if wire.PromptCacheHitTokens > 0 {
 		totalInput = max(int64(0), totalInput-wire.PromptCacheHitTokens)
+	} else if providerSubsetRead > 0 || providerSubsetWrite > 0 {
+		// Without this subtraction the cached prefix is billed twice: once at
+		// the input rate and once at the cache rate.
+		totalInput = max(int64(0), totalInput-providerSubsetRead-providerSubsetWrite)
 	}
 	u.PromptTokens = totalInput
 	u.CompletionTokens = wire.CompletionTokens

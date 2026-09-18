@@ -56,11 +56,22 @@ func CalculateCost(p *Price, u TokenUsage) Cost {
 	if p == nil {
 		return Cost{}
 	}
+	// A provider only reports cache tokens when it supports caching, so a
+	// missing cache rate means "unpriced", not "free". Fall back to the input
+	// rate like EstimateCosts does instead of silently charging $0.
+	cacheReadRate := p.CachedInputPerM
+	if cacheReadRate == 0 && u.CacheReadTokens > 0 {
+		cacheReadRate = p.InputPerM
+	}
+	cacheWriteRate := p.CacheWritePerM
+	if cacheWriteRate == 0 && u.CacheWriteTokens > 0 {
+		cacheWriteRate = p.InputPerM
+	}
 	result := Cost{
 		InputUSD:      float64(u.PromptTokens) * p.InputPerM / 1e6,
 		OutputUSD:     float64(u.CompletionTokens) * p.OutputPerM / 1e6,
-		CacheReadUSD:  float64(u.CacheReadTokens) * p.CachedInputPerM / 1e6,
-		CacheWriteUSD: float64(u.CacheWriteTokens) * p.CacheWritePerM / 1e6,
+		CacheReadUSD:  float64(u.CacheReadTokens) * cacheReadRate / 1e6,
+		CacheWriteUSD: float64(u.CacheWriteTokens) * cacheWriteRate / 1e6,
 		Priced:        true,
 	}
 	result.USD = result.InputUSD + result.OutputUSD + result.CacheReadUSD + result.CacheWriteUSD

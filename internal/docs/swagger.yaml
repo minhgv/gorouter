@@ -4398,6 +4398,36 @@ paths:
       summary: Estimate model cost
       tags:
       - pricing
+  /admin/pricing/sync:
+    post:
+      description: Fetches the configured external price catalog immediately and refreshes
+        the in-process resolver. Only the master session may trigger a sync.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_api_handlers.OKResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_kimnt93_gorouter_internal_api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_kimnt93_gorouter_internal_api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_kimnt93_gorouter_internal_api.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/github_com_kimnt93_gorouter_internal_api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Sync catalog prices
+      tags:
+      - pricing
   /admin/providers:
     get:
       description: Returns the static provider catalog, including supported protocols,

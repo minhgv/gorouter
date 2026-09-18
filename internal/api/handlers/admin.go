@@ -64,6 +64,7 @@ type Admin struct {
 	UsageSvc        *usage.Service
 	Cache           chat.PromptCache
 	Pricing         PriceCatalog
+	PriceSync       PriceSyncer
 	IdentitySvc     *identity.Service
 	IdentityRepo    identity.Repository
 	AuditRepo       entities.AuditRepository
@@ -111,6 +112,27 @@ func (a *Admin) PricingEstimate(c fiber.Ctx) error {
 		response.CacheSupported = response.Price.CachedInputPerM > 0 || response.Price.CacheWritePerM > 0
 	}
 	return responseapi.For(c).Response().Status(fiber.StatusOK).Data(response).Send()
+}
+
+// PricingSync triggers an on-demand refresh of the imported price catalog.
+// @Summary Sync catalog prices
+// @Description Fetches the configured external price catalog immediately and refreshes the in-process resolver. Only the master session may trigger a sync.
+// @Tags pricing
+// @Security BearerAuth
+// @Success 200 {object} OKResponse
+// @Failure 401,403,500,503 {object} responseapi.ErrorResponse
+// @Router /admin/pricing/sync [post]
+func (a *Admin) PricingSync(c fiber.Ctx) error {
+	if sess := SessionFrom(c); sess == nil || !sess.IsMaster() {
+		return responseapi.For(c).Forbidden("only the master session can sync catalog prices").Send()
+	}
+	if a.PriceSync == nil {
+		return responseapi.For(c).Error(fiber.StatusServiceUnavailable, "catalog price sync is not configured", "service_unavailable", "pricing_unavailable").Send()
+	}
+	if err := a.PriceSync.Sync(c.Context()); err != nil {
+		return responseapi.For(c).InternalError("catalog price sync failed").Send()
+	}
+	return responseapi.For(c).Response().Status(fiber.StatusOK).Data(okResponse{OK: true}).Send()
 }
 
 // PricingCatalog returns the imported price catalog.
